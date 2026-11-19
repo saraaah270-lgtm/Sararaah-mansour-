@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>الدائرة الكهربائية التفاعلية - محاكاة مصباح LED</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --bg-panel: #131a2c;
+    --bg-card: #1a2238;
+    --border: #2a3553;
+    --text: #e8eefc;
+    --text-dim: #8b97b8;
+    --accent: #4ade80;
+    --accent-glow: rgba(74, 222, 128, 0.4);
+    --danger: #ef4444;
+    --warning: #fbbf24;
+    --wire: #4a5570;
+    --wire-live: #fbbf24;
+    --battery-pos: #ef4444;
+    --battery-neg: #1a2238;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: 'Segoe UI', 'Tahoma', 'Cairo', 'Noto Sans Arabic', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 20px;
+    line-height: 1.6;
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(74, 222, 128, 0.06) 0%, transparent 40%),
+      radial-gradient(circle at 80% 70%, rgba(99, 102, 241, 0.06) 0%, transparent 40%);
+  }
+
+  .container {
+    max-width: 1300px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 24px;
+    align-items: start;
+  }
+
+  @media (max-width: 980px) {
+    .container { grid-template-columns: 1fr; }
+  }
+
+  /* Header */
+  .header {
+    grid-column: 1 / -1;
+    background: linear-gradient(135deg, var(--bg-panel) 0%, var(--bg-card) 100%);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent) 0%, #60a5fa 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .header p {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    margin-top: 4px;
+  }
+
+  .status-badge {
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    transition: all 0.3s;
+  }
+
+  .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: all 0.3s;
+  }
+
+  .status-badge.on {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .status-badge.on .status-dot {
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent-glow);
+    animation: pulse 1.5s infinite;
+  }
+
+  .status-badge.burnt {
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+  .status-badge.burnt .status-dot {
+    background: var(--danger);
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* Main circuit area */
+  .circuit-panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .circuit-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 30px 30px;
+    pointer-events: none;
+  }
+
+  .circuit-svg-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+  }
+
+  svg.circuit {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* Controls panel */
+  .controls {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+  }
+
+  .card h3 {
+    font-size: 0.95rem;
+    color: var(--text-dim);
+    margin-bottom: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card h3::before {
+    content: '';
+    width: 4px;
+    height: 16px;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  /* Power button */
+  .power-btn {
+    width: 100%;
+    padding: 18px;
+    background: linear-gradient(135deg, var(--bg-card) 0%, #243152 100%);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    font-size: 1.05rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.25s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-family: inherit;
+  }
+
+  .power-btn:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+
+  .power-btn:active {
+    transform: translateY(0);
+  }
+
+  .power-btn.on {
+    background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+    border-color: var(--accent);
+    color: #fff;
+    box-shadow: 0 0 24px var(--accent-glow);
+  }
+
+  .power-icon {
+    width: 22px;
+    height: 22px;
+    border: 2.5px solid currentColor;
+    border-radius: 50%;
+    position: relative;
+    display: inline-block;
+  }
+
+  .power-icon::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2.5px;
+    height: 12px;
+    background: currentColor;
+  }
+
+  /* Sliders */
+  .slider-group {
+    margin-bottom: 16px;
+  }
+  .slider-group:last-child { margin-bottom: 0; }
+
+  .slider-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.88rem;
+  }
+
+  .slider-label span:first-child {
+    color: var(--text-dim);
+  }
+
+  .slider-label .value {
+    background: var(--bg-card);
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    font-weight: 700;
+    color: var(--accent);
+    min-width: 70px;
+    text-align: center;
+    font-family: 'Courier New', monospace;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    background: var(--bg-card);
+    border-radius: 3px;
+    outline: none;
+    border: 1px solid var(--border);
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 10px var(--accent-glow);
+    transition: transform 0.15s;
+  }
+
+  input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 10px var(--accent-glow);
+  }
+
+  /* LED color picker */
+  .color-picker {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  .color-btn {
+    aspect-ratio: 1;
+    border-radius: 10px;
+    border: 2px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--bg-card);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .color-btn:hover {
+    transform: scale(1.05);
+  }
+
+  .color-btn.active {
+    border-color: #fff;
+  }
+
+  .color-btn .dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    box-shadow: 0 0 12px currentColor;
+  }
+
+  /* Measurements */
+  .measurements {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .meter {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .meter .label {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+
+  .meter .reading {
+    font-size: 1.25rem;
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+    color: var(--accent);
+  }
+
+  .meter .unit {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-right: 3px;
+  }
+
+  .meter.danger .reading { color: var(--danger); }
+  .meter.warning .reading { color: var(--warning); }
+
+  /* Info / Ohm's law panel */
+  .info-text {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+
+  .info-text strong {
+    color: var(--text);
+  }
+
+  .formula {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin: 10px 0;
+    font-family: 'Courier New', monospace;
+    font-size: 1rem;
+    color: var(--accent);
+    text-align: center;
+  }
+
+  /* Warning banner */
+  .warning-banner {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid var(--danger);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-top: 14px;
+    color: var(--danger);
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: none;
+    align-items: center;
+    gap: 8px;
+  }
+  .warning-banner.show { display: flex; }
+
+  .warning-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+
+  /* Toast for burnout */
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--danger);
+    color: #fff;
+    padding: 14px 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    box-shadow: 0 10px 40px rgba(239, 68, 68, 0.4);
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+  }
+  .toast.show {
+    transform: translateX(-50%) translateY(-10px);
+    opacity: 1;
+    visibility: visible;
+  }
+
+  /* SVG styling */
+  .wire {
+    stroke: var(--wire);
+    stroke-width: 4;
+    fill: none;
+    stroke-linecap: round;
+    transition: stroke 0.4s;
+  }
+  .wire.live {
+    stroke: var(--wire-live);
+    filter: drop-shadow(0 0 4px var(--wire-live));
+  }
+
+  .electron {
+    fill: #60a5fa;
+    filter: drop-shadow(0 0 4px #60a5fa);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .electron.active {
+    opacity: 1;
+    animation: flow var(--flow-duration, 2s) linear infinite;
+  }
+  @keyframes flow {
+    from { offset-distance: 0%; }
+    to { offset-distance: 100%; }
+  }
+
+  /* Battery */
+  .battery-plate-pos { stroke: var(--battery-pos); }
+  .battery-plate-neg { stroke: var(--text); }
+
+  /* Switch */
+  .switch-lever {
+    stroke: #cbd5e1;
+    stroke-width: 6;
+    stroke-linecap: round;
+    transform-origin: var(--origin, 100px 100px);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    cursor: pointer;
+  }
+  .switch-lever.closed { transform: rotate(0deg); }
+  .switch-lever.open { transform: rotate(-35deg); }
+
+  .switch-base {
+    fill: var(--bg-card);
+    stroke: var(--border);
+    stroke-width: 2;
+  }
+
+  /* Resistor */
+  .resistor-body {
+    fill: #d97706;
+    stroke: #92400e;
+    stroke-width: 1.5;
+  }
+  .resistor-stripe { fill: #000; }
+
+  /* LED */
+  .led-body {
+    transition: all 0.3s;
+  }
+  .led-glow {
+    opacity: 0;
+    transition: opacity 0.4s;
+    pointer-events: none;
+  }
+  .led-glow.on {
+    opacity: 1;
+  }
+
+  /* Component labels */
+  .comp-label {
+    fill: var(--text-dim);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'Segoe UI', sans-serif;
+    text-anchor: middle;
+  }
+
+  .comp-value {
+    fill: var(--accent);
+    font-size: 12px;
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+    text-anchor: middle;
+  }
+
+  /* Reset button */
+  .reset-btn {
+    width: 100%;
+    padding: 10px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-family: inherit;
+    transition: all 0.2s;
+    margin-top: 8px;
+  }
+  .reset-btn:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+
+  /* Footer */
+  .footer {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    padding: 16px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <h1>الدائرة الكهربائية التفاعلية</h1>
+      <p>محاكاة مصباح LED — افتح وأغلق الدائرة وراقب سلوك المصباح</p>
+    </div>
+    <div class="status-badge" id="statusBadge">
+      <span class="status-dot"></span>
+      <span id="statusText">الدائرة مفتوحة</span>
+    </div>
+  </div>
+
+  <!-- Main circuit visualization -->
+  <div class="circuit-panel">
+    <div class="circuit-svg-wrap">
+      <svg class="circuit" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet">
+        <!-- Definitions: gradients, glow filters, electron path -->
+        <defs>
+          <!-- Glow filter for LED -->
+          <filter id="ledGlow" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur stdDeviation="12" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+
+          <!-- Soft glow for electrons -->
+          <filter id="electronGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+
+          <!-- Radial gradients for LED bulb -->
+          <radialGradient id="ledGradOff">
+            <stop offset="0%" stop-color="#444" />
+            <stop offset="100%" stop-color="#222" />
+          </radialGradient>
+
+          <!-- Electron flow path (closed loop) -->
+          <!-- Battery(+) -> top wire -> switch -> top wire -> resistor -> right wire -> LED -> bottom wire -> battery(-) -->
+          <path id="flowPath" d="
+            M 130 450
+            L 130 130
+            L 280 130
+            L 380 130
+            L 520 130
+            L 670 130
+            L 670 290
+            L 670 360
+            L 670 470
+            L 130 470
+            L 130 450
+          " fill="none" stroke="none" />
+
+          <!-- Light rays for LED -->
+          <radialGradient id="lightRays" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="white" stop-opacity="0.8"/>
+            <stop offset="40%" stop-color="white" stop-opacity="0.2"/>
+            <stop offset="100%" stop-color="white" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+
+        <!-- ============ WIRES (drawn first, behind components) ============ -->
+        <!-- Top-left wire: battery(+) -> switch -->
+        <path class="wire" id="wire1" d="M 130 450 L 130 130 L 280 130" />
+        <!-- Top-middle wire: switch -> resistor -->
+        <path class="wire" id="wire2" d="M 380 130 L 520 130" />
+        <!-- Top-right wire: resistor -> LED top -->
+        <path class="wire" id="wire3" d="M 670 130 L 670 290" />
+        <!-- Bottom wire: LED bottom -> battery(-) -->
+        <path class="wire" id="wire4" d="M 670 360 L 670 470 L 130 470" />
+
+        <!-- ============ BATTERY ============ -->
+        <g id="battery">
+          <!-- Long plate (positive) -->
+          <line class="battery-plate-pos" x1="80" y1="430" x2="180" y2="430" stroke-width="6" stroke-linecap="round"/>
+          <!-- Short plate (negative) -->
+          <line class="battery-plate-neg" x1="105" y1="470" x2="155" y2="470" stroke-width="6" stroke-linecap="round"/>
+          <!-- Connection wires to circuit -->
+          <line class="wire" x1="130" y1="430" x2="130" y2="450" />
+          <line class="wire" x1="130" y1="470" x2="130" y2="470" />
+          <!-- Labels -->
+          <text x="190" y="435" class="comp-label" text-anchor="start" fill="#ef4444" font-weight="700">+</text>
+          <text x="190" y="475" class="comp-label" text-anchor="start" fill="#8b97b8">−</text>
+          <text x="130" y="525" class="comp-label">البطارية</text>
+          <text x="130" y="545" class="comp-value" id="batteryValue">9.0 V</text>
+        </g>
+
+        <!-- ============ SWITCH ============ -->
+        <g id="switch">
+          <!-- Left terminal -->
+          <circle cx="280" cy="130" r="6" fill="#cbd5e1"/>
+          <!-- Right terminal -->
+          <circle cx="380" cy="130" r="6" fill="#cbd5e1"/>
+          <!-- Switch lever (pivot at right terminal, 380,130) -->
+          <line id="switchLever" class="switch-lever closed"
+                x1="380" y1="130" x2="280" y2="130"
+                style="--origin: 380px 130px; transform-origin: 380px 130px;" />
+          <!-- Label -->
+          <text x="330" y="80" class="comp-label">المفتاح</text>
+          <text x="330" y="100" class="comp-value" id="switchValue">مغلق</text>
+        </g>
+
+        <!-- ============ RESISTOR ============ -->
+        <g id="resistor">
+          <!-- Body (zigzag pattern) -->
+          <polyline class="wire" points="520,130 535,110 555,150 575,110 595,150 615,110 635,150 650,130"
+                    stroke="#d97706" stroke-width="5" />
+          <!-- Labels -->
+          <text x="585" y="180" class="comp-label">المقاوم</text>
+          <text x="585" y="200" class="comp-value" id="resistorValue">470 Ω</text>
+        </g>
+
+        <!-- ============ LED ============ -->
+        <g id="led">
+          <!-- Glow halo (shown when on) -->
+          <circle id="ledGlow" class="led-glow" cx="670" cy="325" r="80"
+                  fill="currentColor" filter="url(#ledGlow)" />
+
+          <!-- Light rays -->
+          <circle id="ledRays" class="led-glow" cx="670" cy="325" r="50"
+                  fill="url(#lightRays)" />
+
+          <!-- Triangle (anode side / top wire connection) -->
+          <!-- LED is between y=290 (top, anode) and y=360 (bottom, cathode) -->
+          <!-- Wires go: top wire ends at 670,290; bottom wire starts at 670,360 -->
+
+          <!-- LED triangle pointing down (toward cathode) -->
+          <polygon id="ledTriangle" class="led-body"
+                   points="670,295 650,330 690,330"
+                   fill="url(#ledGradOff)" stroke="#666" stroke-width="2" />
+
+          <!-- Cathode bar -->
+          <line id="ledCathode" x1="650" y1="340" x2="690" y2="340"
+                stroke="#666" stroke-width="3" />
+
+          <!-- Bulb circle around the LED symbol -->
+          <circle id="ledCircle" cx="670" cy="325" r="32"
+                  fill="none" stroke="#666" stroke-width="2" stroke-dasharray="3,3" />
+
+          <!-- Emission arrows -->
+          <g id="ledArrows" stroke="#666" stroke-width="1.5" fill="none">
+            <line x1="710" y1="315" x2="725" y2="305" />
+            <polyline points="720,305 725,305 725,310" />
+            <line x1="710" y1="335" x2="725" y2="345" />
+            <polyline points="720,345 725,345 725,340" />
+          </g>
+
+          <!-- Labels -->
+          <text x="670" y="395" class="comp-label">مصباح LED</text>
+          <text x="670" y="415" class="comp-value" id="ledColorLabel">أحمر</text>
+        </g>
+
+        <!-- ============ ELECTRONS (animated) ============ -->
+        <!-- Multiple electrons evenly distributed along the path -->
+        <g id="electrons">
+          <circle class="electron" r="4" style="offset-path: path('M 130 450 L 130 130 L 280 130 L 380 130 L 520 130 L 670 130 L 670 290 L 670 360 L 670 470 L 130 470 L 130 450'); animation-delay: 0s;" />
+          <circle class="electron" r="4" style="offset-path: path('M 130 450 L 130 130 L 280 130 L 380 130 L 520 130 L 670 130 L 670 290 L 670 360 L 670 470 L 130 470 L 130 450'); animation-delay: -0.25s;" />
+          <circle class="electron" r="4" style="offset-path: path('M 130 450 L 130 130 L 280 130 L 380 130 L 520 130 L 670 130 L 670 290 L 670 360 L 670 470 L 130 470 L 130 450'); animation-delay: -0.5s;" />
+          <circle class="electron" r="4" style="offset-path: path('M 130 450 L 130 130 L 280 130 L 380 130 L 520 130 L 670 130 L 670 290 L 670 360 L 670 470 L 130 470 L 130 450'); animation-delay: -0.75s;" />
+          <circle class="electron" r="4" style="offset-path: path('M 130 450 L 130 130 L 280 130 L 380 130 L 520 130 L 670 130 L 670 290 L 670 360 L 670 470 L 130 470 L 130 450'); animation-delay: -1s;" />
+          <circle class="electron" r="4" style="offset-path: path('M 130 450 L 130 130 L 280 130 L 380 130 L 520 130 L 670 130 L 670 290 L 670 360 L 670 470 L 130 470 L 130 450'); animation-delay: -1.25s;" />
+          <circle class="electron" r="4" style="offset-path: path('M 130 450 L 130 130 L 280 130 L 380 130 L 520 130 L 670 130 L 670 290 L 670 360 L 670 470 L 130 470 L 130 450'); animation-delay: -1.5s;" />
+          <circle class="electron" r="4" style="offset-path: path('M 130 450 L 130 130 L 280 130 L 380 130 L 520 130 L 670 130 L 670 290 L 670 360 L 670 470 L 130 470 L 130 450'); animation-delay: -1.75s;" />
+        </g>
+
+      </svg>
+    </div>
+  </div>
+
+  <!-- Controls panel -->
+  <div class="controls">
+
+    <!-- Power button -->
+    <div class="card">
+      <h3>التحكم الرئيسي</h3>
+      <button class="power-btn" id="powerBtn">
+        <span class="power-icon"></span>
+        <span id="powerBtnText">تشغيل الدائرة</span>
+      </button>
+      <button class="reset-btn" id="resetBtn">استبدال LED المحترق</button>
+    </div>
+
+    <!-- Parameters -->
+    <div class="card">
+      <h3>المعاملات</h3>
+
+      <div class="slider-group">
+        <div class="slider-label">
+          <span>جهد البطارية</span>
+          <span class="value" id="voltDisplay">9.0 V</span>
+        </div>
+        <input type="range" id="voltSlider" min="0" max="12" step="0.5" value="9" />
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label">
+          <span>قيمة المقاوم</span>
+          <span class="value" id="resDisplay">470 Ω</span>
+        </div>
+        <input type="range" id="resSlider" min="50" max="1000" step="10" value="470" />
+      </div>
+    </div>
+
+    <!-- LED Color -->
+    <div class="card">
+      <h3>لون مصباح LED</h3>
+      <div class="color-picker">
+        <button class="color-btn active" data-color="red" data-vf="2.0" style="color:#ef4444;">
+          <span class="dot"></span>
+        </button>
+        <button class="color-btn" data-color="green" data-vf="2.1" style="color:#22c55e;">
+          <span class="dot"></span>
+        </button>
+        <button class="color-btn" data-color="blue" data-vf="3.0" style="color:#3b82f6;">
+          <span class="dot"></span>
+        </button>
+        <button class="color-btn" data-color="yellow" data-vf="2.1" style="color:#facc15;">
+          <span class="dot"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Measurements -->
+    <div class="card">
+      <h3>القياسات الفورية</h3>
+      <div class="measurements">
+        <div class="meter" id="meterVoltage">
+          <div class="label">الجهد (V)</div>
+          <div class="reading"><span id="readVoltage">0.00</span><span class="unit">V</span></div>
+        </div>
+        <div class="meter" id="meterCurrent">
+          <div class="label">التيار (I)</div>
+          <div class="reading"><span id="readCurrent">0.0</span><span class="unit">mA</span></div>
+        </div>
+        <div class="meter" id="meterResistance">
+          <div class="label">المقاومة (R)</div>
+          <div class="reading"><span id="readResistance">330</span><span class="unit">Ω</span></div>
+        </div>
+        <div class="meter" id="meterPower">
+          <div class="label">الاستطاعة (P)</div>
+          <div class="reading"><span id="readPower">0.0</span><span class="unit">mW</span></div>
+        </div>
+      </div>
+      <div class="warning-banner" id="warningBanner">
+        <svg class="warning-icon" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+        </svg>
+        <span id="warningText"></span>
+      </div>
+    </div>
+
+    <!-- Ohm's law info -->
+    <div class="card">
+      <h3>قانون أوم</h3>
+      <div class="info-text">
+        عند إغلاق الدائرة، يمر التيار عبر المقاوم إلى مصباح LED. تُحسب القيم وفق قانون أوم:
+        <div class="formula">I = (V − V<sub>LED</sub>) / R</div>
+        حيث V<sub>LED</sub> هو جهد الانحياز الأمامي للمصباح (يعتمد على اللون). التيار الآمن لـ LED يتراوح بين <strong>10-20 مللي أمبير</strong>. تجاوز هذا الحد يحرق المصباح.
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    محاكاة تعليمية تفاعلية — اختر لون LED واضبط المعاملات ثم شغّل الدائرة
+  </div>
+
+</div>
+
+<!-- Toast for LED burnout -->
+<div class="toast" id="toast">
+  <svg class="warning-icon" viewBox="0 0 24 24" fill="currentColor" style="color:#fff;">
+    <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+  </svg>
+  <span id="toastText">احترق مصباح LED!</span>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ============ State ============
+  const state = {
+    power: false,           // switch open/closed
+    voltage: 9.0,           // battery voltage (V)
+    resistance: 470,        // resistor value (Ω)
+    ledColor: 'red',
+    ledVf: 2.0,             // LED forward voltage
+    ledColorHex: '#ef4444',
+    burnt: false,           // LED has been burned out
+    safeCurrentMax: 30,     // mA - LED burns above this
+    warningCurrent: 20      // mA - warning threshold
+  };
+
+  const colorMap = {
+    red:    { hex: '#ef4444', vf: 2.0, label: 'أحمر' },
+    green:  { hex: '#22c55e', vf: 2.1, label: 'أخضر' },
+    blue:   { hex: '#3b82f6', vf: 3.0, label: 'أزرق' },
+    yellow: { hex: '#facc15', vf: 2.1, label: 'أصفر' }
+  };
+
+  // ============ DOM refs ============
+  const $ = id => document.getElementById(id);
+
+  const powerBtn      = $('powerBtn');
+  const powerBtnText  = $('powerBtnText');
+  const resetBtn      = $('resetBtn');
+  const voltSlider    = $('voltSlider');
+  const voltDisplay   = $('voltDisplay');
+  const resSlider     = $('resSlider');
+  const resDisplay    = $('resDisplay');
+  const switchLever   = $('switchLever');
+  const switchValue   = $('switchValue');
+  const batteryValue  = $('batteryValue');
+  const resistorValue = $('resistorValue');
+  const ledColorLabel = $('ledColorLabel');
+  const ledTriangle   = $('ledTriangle');
+  const ledCathode    = $('ledCathode');
+  const ledCircle     = $('ledCircle');
+  const ledGlow       = $('ledGlow');
+  const ledRays       = $('ledRays');
+  const ledArrows     = $('ledArrows');
+  const electrons     = document.querySelectorAll('.electron');
+  const wires         = document.querySelectorAll('.wire');
+  const statusBadge   = $('statusBadge');
+  const statusText    = $('statusText');
+  const warningBanner = $('warningBanner');
+  const warningText   = $('warningText');
+  const toast         = $('toast');
+  const toastText     = $('toastText');
+
+  const readVoltage   = $('readVoltage');
+  const readCurrent   = $('readCurrent');
+  const readResistance= $('readResistance');
+  const readPower     = $('readPower');
+
+  const meterCurrent  = $('meterCurrent');
+  const meterPower    = $('meterPower');
+
+  // ============ Physics calculation ============
+  // I = (V - Vf) / R,  in Amperes
+  // Returns milliAmperes
+  function calcCurrent() {
+    if (state.voltage <= state.ledVf) return 0;
+    const i = (state.voltage - state.ledVf) / state.resistance; // A
+    return i * 1000; // mA
+  }
+
+  // ============ Update LED color ============
+  function setLedColor(color) {
+    const c = colorMap[color];
+    state.ledColor = color;
+    state.ledVf = c.vf;
+    state.ledColorHex = c.hex;
+    ledColorLabel.textContent = c.label;
+
+    // Update LED glow color
+    ledGlow.setAttribute('fill', c.hex);
+    // Update LED body to a dim version of the color when off, bright when on
+    updateLedAppearance();
+  }
+
+  // ============ Update LED appearance (on/off/burnt) ============
+  function updateLedAppearance() {
+    if (state.burnt) {
+      // Burnt LED: dark/black
+      ledTriangle.setAttribute('fill', '#1a1a1a');
+      ledTriangle.setAttribute('stroke', '#333');
+      ledCathode.setAttribute('stroke', '#333');
+      ledCircle.setAttribute('stroke', '#333');
+      ledArrows.setAttribute('stroke', '#333');
+      ledGlow.classList.remove('on');
+      ledRays.classList.remove('on');
+      return;
+    }
+
+    if (state.power && state.voltage > state.ledVf) {
+      // LED is ON
+      const c = state.ledColorHex;
+      ledTriangle.setAttribute('fill', c);
+      ledTriangle.setAttribute('stroke', c);
+      ledCathode.setAttribute('stroke', c);
+      ledCircle.setAttribute('stroke', c);
+      ledArrows.setAttribute('stroke', c);
+      ledGlow.classList.add('on');
+      ledRays.classList.add('on');
+    } else {
+      // LED is OFF
+      ledTriangle.setAttribute('fill', 'url(#ledGradOff)');
+      ledTriangle.setAttribute('stroke', '#666');
+      ledCathode.setAttribute('stroke', '#666');
+      ledCircle.setAttribute('stroke', '#666');
+      ledArrows.setAttribute('stroke', '#666');
+      ledGlow.classList.remove('on');
+      ledRays.classList.remove('on');
+    }
+  }
+
+  // ============ Update electron animation ============
+  function updateElectrons() {
+    const current = calcCurrent(); // mA
+    electrons.forEach(el => {
+      if (state.power && !state.burnt && current > 0) {
+        el.classList.add('active');
+        // Speed: higher current = faster animation
+        // Map current (mA) to duration (s): 100mA => 0.5s, 1mA => 8s
+        const dur = Math.max(0.4, Math.min(8, 8 / Math.max(0.1, current / 5)));
+        el.style.setProperty('--flow-duration', dur + 's');
+      } else {
+        el.classList.remove('active');
+      }
+    });
+  }
+
+  // ============ Update wires (live/not live) ============
+  function updateWires() {
+    wires.forEach(w => {
+      if (state.power && !state.burnt && state.voltage > state.ledVf) {
+        w.classList.add('live');
+      } else {
+        w.classList.remove('live');
+      }
+    });
+  }
+
+  // ============ Update measurements display ============
+  function updateMeasurements() {
+    const current = state.power && !state.burnt ? calcCurrent() : 0;
+    const voltageAcrossR = (current / 1000) * state.resistance; // V = I*R
+    const power = voltageAcrossR * (current / 1000) * 1000; // mW = V * I (in A) * 1000
+
+    // Actually: total power drawn from battery = V * I (battery voltage * current)
+    // Power consumed by resistor: I^2 * R
+    // Power consumed by LED: Vf * I
+    // Let's show total circuit power = V_battery * I
+    const totalPower = state.voltage * (current / 1000) * 1000; // mW
+
+    readVoltage.textContent = state.voltage.toFixed(2);
+    readCurrent.textContent = current.toFixed(1);
+    readResistance.textContent = state.resistance;
+    readPower.textContent = totalPower.toFixed(1);
+
+    // Meter color states
+    meterCurrent.classList.remove('danger', 'warning');
+    meterPower.classList.remove('danger', 'warning');
+
+    if (state.power && !state.burnt) {
+      if (current > state.safeCurrentMax) {
+        meterCurrent.classList.add('danger');
+        meterPower.classList.add('danger');
+      } else if (current > state.warningCurrent) {
+        meterCurrent.classList.add('warning');
+        meterPower.classList.add('warning');
+      }
+    }
+
+    // Warning banner
+    if (state.power && !state.burnt && current > state.warningCurrent) {
+      warningBanner.classList.add('show');
+      if (current > state.safeCurrentMax) {
+        warningText.textContent = 'خطر: التيار ' + current.toFixed(1) + ' مللي أمبير — يتجاوز الحد الآمن (20 مللي أمبير). سيتلف LED!';
+      } else {
+        warningText.textContent = 'تحذير: التيار يقترب من الحد الأقصى الآمن لـ LED (' + current.toFixed(1) + ' مللي أمبير)';
+      }
+    } else {
+      warningBanner.classList.remove('show');
+    }
+  }
+
+  // ============ Update status badge ============
+  function updateStatus() {
+    statusBadge.classList.remove('on', 'burnt');
+    if (state.burnt) {
+      statusBadge.classList.add('burnt');
+      statusText.textContent = 'LED محترق';
+    } else if (state.power) {
+      statusBadge.classList.add('on');
+      statusText.textContent = 'الدائرة مغلقة';
+    } else {
+      statusText.textContent = 'الدائرة مفتوحة';
+    }
+  }
+
+  // ============ Burn out LED ============
+  function burnLed() {
+    state.burnt = true;
+    state.power = false; // circuit opens due to burnout
+    updateAll();
+    showToast('احترق مصباح LED! التيار كان مرتفعاً جداً.');
+  }
+
+  // ============ Show toast ============
+  let toastTimeout;
+  function showToast(msg) {
+    toastText.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => toast.classList.remove('show'), 4000);
+  }
+
+  // ============ Reset LED ============
+  function resetLed() {
+    if (!state.burnt) return;
+    state.burnt = false;
+    updateAll();
+    showToast('تم استبدال LED بمصباح جديد');
+  }
+
+  // ============ Master update ============
+  function updateAll() {
+    // Switch lever animation
+    if (state.power && !state.burnt) {
+      switchLever.classList.remove('open');
+      switchLever.classList.add('closed');
+      switchValue.textContent = 'مغلق';
+    } else {
+      switchLever.classList.remove('closed');
+      switchLever.classList.add('open');
+      switchValue.textContent = state.burnt ? 'مفتوح (احتراق)' : 'مفتوح';
+    }
+
+    // Power button state
+    if (state.power && !state.burnt) {
+      powerBtn.classList.add('on');
+      powerBtnText.textContent = 'إيقاف الدائرة';
+    } else {
+      powerBtn.classList.remove('on');
+      powerBtnText.textContent = state.burnt ? 'الدائرة معطلة' : 'تشغيل الدائرة';
+    }
+
+    updateLedAppearance();
+    updateElectrons();
+    updateWires();
+    updateMeasurements();
+    updateStatus();
+  }
+
+  // ============ Toggle power ============
+  function togglePower() {
+    if (state.burnt) {
+      showToast('لا يمكن تشغيل الدائرة — LED محترق. استبدله أولاً.');
+      return;
+    }
+    state.power = !state.power;
+
+    // Check if turning on would burn the LED
+    if (state.power) {
+      const current = calcCurrent();
+      if (current > state.safeCurrentMax) {
+        // Burn the LED after a short delay (let user see the flash)
+        updateAll();
+        setTimeout(() => {
+          burnLed();
+        }, 600);
+        return;
+      }
+    }
+    updateAll();
+  }
+
+  // ============ Event listeners ============
+  powerBtn.addEventListener('click', togglePower);
+  resetBtn.addEventListener('click', resetLed);
+
+  // Click on switch lever also toggles
+  switchLever.addEventListener('click', togglePower);
+
+  voltSlider.addEventListener('input', e => {
+    state.voltage = parseFloat(e.target.value);
+    voltDisplay.textContent = state.voltage.toFixed(1) + ' V';
+    batteryValue.textContent = state.voltage.toFixed(1) + ' V';
+    updateAll();
+  });
+
+  resSlider.addEventListener('input', e => {
+    state.resistance = parseInt(e.target.value, 10);
+    resDisplay.textContent = state.resistance + ' Ω';
+    resistorValue.textContent = state.resistance + ' Ω';
+    updateAll();
+  });
+
+  // Color picker
+  document.querySelectorAll('.color-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const color = btn.dataset.color;
+      setLedColor(color);
+      updateAll();
+    });
+  });
+
+  // ============ Initialize ============
+  setLedColor('red');
+  updateAll();
+
+})();
+</script>
+</body>
+</html>
